@@ -1,0 +1,161 @@
+--[[
+
+Based on the content of the video, 
+it appears that a player used the spell "frigo" 
+and then cast a whirlwind that fixed in range 
+and lasted for several waves (it's unclear whether the location was random). 
+I investigated the implementation of the TFS skill based on the LUA file in the DATA. 
+I broke down this skill into five whirlwind generations, 
+sequentially delaying the release of each whirlwind.
+
+
+I observed that the whirlwinds are generated 
+at intervals based on the positions marked '1' in the 2D array,AREA_CIRCLE.
+Additionally, the effects for large and small whirlwinds are generated on different rows, 
+also at intervals. Therefore, I set up the AREA content accordingly.
+
+At the same time, through the TFS GitHub repository, 
+I found that various functions are defined in the DLL. 
+To avoid modifying and recompiling the DLL, 
+I chose to implement the changes by editing the LUA and XML files only.
+
+--]]
+
+
+-- create spell area
+FRIGO_AREA_CIRCLE = {
+	{0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	{0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	{0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+	{0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0},
+	{0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	{0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	{0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0}
+}
+
+FRIGO_AREA_CIRCLE_2 = {
+	{0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0},
+	{0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0},
+	{0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+	{1, 0, 0, 0, 1, 3, 1, 0, 0, 0, 1},
+	{0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+	{0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0},
+	{0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0},
+	{0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0}
+}
+
+FRIGO_AREA_CIRCLE_3 = {
+	{0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+	{0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0},
+	{0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0},
+	{0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0},
+	{0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0},
+	{1, 0, 0, 0, 1, 3, 1, 0, 0, 0, 1},
+	{0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0},
+	{0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0},
+	{0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0},
+	{0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0},
+	{0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0}
+}
+
+FRIGO_AREA_CIRCLE_4 = {
+	{0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+	{0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0},
+	{0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+	{0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0},
+	{0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0}
+}
+
+FRIGO_AREA_CIRCLE_5 = {
+	{0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0},
+	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	{0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0},
+	{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
+	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	{0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	{0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0}
+}
+
+local combat = Combat()
+combat:setParameter(COMBAT_PARAM_TYPE, COMBAT_ICEDAMAGE)
+combat:setParameter(COMBAT_PARAM_EFFECT, CONST_ME_ICETORNADO)
+combat:setArea(createCombatArea(FRIGO_AREA_CIRCLE))
+
+local combat_2 = Combat()
+combat_2:setParameter(COMBAT_PARAM_TYPE, COMBAT_ICEDAMAGE)
+combat_2:setParameter(COMBAT_PARAM_EFFECT, CONST_ME_ICETORNADO)
+combat_2:setArea(createCombatArea(FRIGO_AREA_CIRCLE_2))
+
+local combat_3 = Combat()
+combat_3:setParameter(COMBAT_PARAM_TYPE, COMBAT_ICEDAMAGE)
+combat_3:setParameter(COMBAT_PARAM_EFFECT, CONST_ME_ICETORNADO)
+combat_3:setArea(createCombatArea(FRIGO_AREA_CIRCLE_3))
+
+local combat_4 = Combat()
+combat_4:setParameter(COMBAT_PARAM_TYPE, COMBAT_ICEDAMAGE)
+combat_4:setParameter(COMBAT_PARAM_EFFECT, CONST_ME_ICETORNADO)
+combat_4:setArea(createCombatArea(FRIGO_AREA_CIRCLE_4))
+
+local combat_5 = Combat()
+combat_5:setParameter(COMBAT_PARAM_TYPE, COMBAT_ICEDAMAGE)
+combat_5:setParameter(COMBAT_PARAM_EFFECT, CONST_ME_ICETORNADO)
+combat_5:setArea(createCombatArea(FRIGO_AREA_CIRCLE_5))
+
+
+function onGetFormulaValues(player, level, magicLevel)
+    local min = (level / 5) + (magicLevel * 1.4) + 8
+    local max = (level / 5) + (magicLevel * 2.2) + 13
+    return -min, -max
+end
+
+combat:setCallback(CALLBACK_PARAM_LEVELMAGICVALUE, "onGetFormulaValues")
+combat_2:setCallback(CALLBACK_PARAM_LEVELMAGICVALUE, "onGetFormulaValues")
+combat_3:setCallback(CALLBACK_PARAM_LEVELMAGICVALUE, "onGetFormulaValues")
+combat_4:setCallback(CALLBACK_PARAM_LEVELMAGICVALUE, "onGetFormulaValues")
+combat_5:setCallback(CALLBACK_PARAM_LEVELMAGICVALUE, "onGetFormulaValues")
+
+--core function 
+-- run the spell part1 to part5
+
+function RunPart1(creature,variant)
+	combat:execute(creature, variant)
+end
+function RunPart2(creature,variant)
+	combat_2:execute(creature, variant)
+end
+function RunPart3(creature,variant)
+	combat_3:execute(creature, variant)
+end
+function RunPart4(creature,variant)
+	combat_4:execute(creature, variant)
+end
+function RunPart5(creature,variant)
+	combat_5:execute(creature, variant)
+end
+
+-- cast
+function onCastSpell(creature, variant)
+	addEvent(RunPart1,0,creature,variant)
+	addEvent(RunPart2,500,creature,variant)
+	addEvent(RunPart3,1000,creature,variant)
+	addEvent(RunPart4,1500,creature,variant)
+	addEvent(RunPart5,2000,creature,variant)
+  return true
+end

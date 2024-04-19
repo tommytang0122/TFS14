@@ -1,0 +1,189 @@
+//// Tommy Tang
+//// 20240419
+//// Tarvernlight OA
+//Q1-Q4 - Fix or improve the implementation of the below methods.
+
+ 
+
+//Q1 - Fix or improve the implementation of the below methods
+
+
+local KEY_VALUE = 1000
+local DELAY = 1000
+
+local function releaseStorage(player)
+-- add validation check
+    if player == nil then
+
+        print("player is nil")
+        return
+
+    end
+    player:setStorageValue(KEY_VALUE, -1)
+end
+
+ 
+
+function onLogout(player)
+-- add validation check
+    if player == nil then
+    
+        print("player is nil")
+        return
+    
+    end
+    
+    if player:getStorageValue(KEY_VALUE) == 1 then
+-- use DELAY rather than 1000
+        addEvent(releaseStorage, DELAY, player)
+
+    end
+
+return true
+
+end
+
+ 
+
+ 
+
+//Q2 - Fix or improve the implementation of the below method
+
+ 
+
+function printSmallGuildNames(memberCount)
+
+-- this method is supposed to print names of all guilds that have less than memberCount max members
+
+-- local selectGuildQuery = "SELECT name FROM guilds WHERE max_members < %d;"
+-- preventing SQL injection
+local selectGuildQuery = string.format("SELECT name FROM guilds WHERE max_members < %d;", memberCount)
+
+
+local resultId = db.storeQuery(selectGuildQuery)
+-- check the validation of resultId
+-- I guess the the data from db should be a list(array) of guild's name
+-- so use a while loop to print the guildname
+if resultId then
+    repeat
+        local guildName = result.getString(resultId, "name")
+        print(guildName)
+    until not result.next(resultId)
+
+-- clean up
+    result.free(resultId)
+
+else
+    print("nothing found")
+end
+
+end
+
+ 
+
+ 
+
+//Q3 - Fix or improve the name and the implementation of the below method
+
+ 
+--[[
+Naming needs to adhere to consistency and readability. 
+Here, I have adopted camel case to align with the functions provided in other questions (I assume this is the uniform practice of your company), 
+and I have changed the function names to directly indicate what the function does, which enhances readability.
+—]]
+function removeMemberFromPlayerParty(playerId, memberName)
+-- "player" should be a local variable. 
+-- Since the name 'player' is very common, setting it as a global variable can cause many issues.
+local player = Player(playerId)
+
+-- validation check
+if player == nil then
+    print("player is not found.")
+end
+
+local party = player:getParty()
+
+-- validation check
+if party == nil then
+    print("player is not in a party")
+end
+
+-- move all function calls outside the for loop to improve performance.
+local targetMember = Player(memberName)
+local partyMembers = party:getMembers()
+
+for k,v in pairs(partyMembers) do
+
+    if v == targetMember then
+
+        party:removeMember(targetMember)
+        return
+    end
+
+end
+
+end
+
+ 
+
+
+//Q4 - Assume all method calls work fine. Fix the memory leak issue in below method
+
+ 
+
+void Game::addItemToPlayer(const std::string& recipient, uint16_t itemId)
+{
+
+    Player* player = g_game.getPlayerByName(recipient);
+    //create a flag to record the player is new or not
+    bool isOfflinePlayer = false;
+
+    if (!player) {
+
+        player = new Player(nullptr);
+        isOfflinePlayer = true;
+
+        if (!IOLoginData::loadPlayerByName(player, recipient)) {
+        //here we should delete the player to avoid memory leak.
+            delete player;
+            return;
+
+        }
+
+    }   
+
+
+    Item* item = Item::CreateItem(itemId);
+
+    if (!item) {
+        //here we should delete the player if item creation fails. 
+        if(isOfflinePlayer){
+
+            delete player;
+
+        }
+
+        return;
+
+    }
+
+ 
+
+    g_game.internalAddItem(player->getInbox(), item, INDEX_WHEREEVER, FLAG_NOLIMIT);
+
+ 
+
+    if (player->isOffline()) {
+
+    IOLoginData::savePlayer(player);
+
+    }
+    //here we should delete the player when we finished save the player.
+    if(isOfflinePlayer){
+
+        delete player;
+
+    }
+
+}
+
